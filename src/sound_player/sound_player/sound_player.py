@@ -1,6 +1,6 @@
 import rclpy
 from rclpy.node import Node
-from std_msgs.msg import String
+from std_msgs.msg import String, Bool
 from sensor_msgs.msg import BatteryState
 import subprocess
 import time
@@ -25,6 +25,16 @@ class SoundPlayer(Node):
             self.battery_callback,
             10
         )
+
+        # Reboot trigger subscription
+        self.reboot_sub = self.create_subscription(
+            Bool,
+            '/reboot',
+            self.reboot_callback,
+            10
+        )
+
+
         self.latest_voltage = None
         # fully charged 12.6v; fully discharged 9v
         self.low_voltage_threshold = 0.2 # percentage
@@ -62,6 +72,18 @@ class SoundPlayer(Node):
         except Exception as e:
             self.get_logger().error(f"Failed to play sound: {e}")
 
+    def reboot_callback(self, msg: Bool):
+        if msg.data:
+            self.get_logger().warn("Reboot command received, restarting mirte-ros...")
+            try:
+                subprocess.run(
+                    ['sudo', 'systemctl', 'restart', 'mirte-ros'],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL
+                )
+            except Exception as e:
+                self.get_logger().error(f"Failed to reboot: {e}")
+                
 def main(args=None):
     rclpy.init(args=args)
     node = SoundPlayer()
